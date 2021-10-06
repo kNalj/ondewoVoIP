@@ -1,0 +1,21 @@
+Accounts:
+    ondewo@sip2sip.info:
+        display_name = "SIP on Virtual Machine"
+        enabled = true
+        auth:
+            password = ondewo12
+
+
+
+SIPSimpleSettings:
+    default_account = ondewo@sip2sip.info
+    instance_id = "urn:uuid:835642a8-1b95-48e0-a943-96e4ef2d3872"
+    audio:
+        alert_device = system_default
+        input_device = system_default
+        output_device = system_default
+
+    video:
+        device = system_default
+
+
