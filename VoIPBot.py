@@ -1,34 +1,38 @@
 from threading import Event
+import base64
 from application.notification import NotificationCenter
 from application.python import Null
 from sipsimple.configuration.settings import SIPSimpleSettings
 
 from sipsimple.session import Session
-from sipsimple.account import Account, AccountManager, BonjourAccount
+from sipsimple.account import Account, AccountManager
 from sipsimple.application import SIPApplication
-from application.notification import NotificationCenter, NotificationData
 from sipsimple.audio import WavePlayer
 from sipsimple.storage import FileStorage
-from sipsimple.configuration import ConfigurationManager
 from sipsimple.threading.green import run_in_green_thread
-from sipsimple.util import user_info, execute_once
-
+from sipsimple.util import execute_once
 
 
 class VoIPBot(SIPApplication):
 	def __init__(self):
 		"""
-
+		TODO: Write documentation
 		"""
 		print("Building VoIP bot . . .")
 
 		super(SIPApplication, self).__init__()
 		
 		self.account = None
-		self.session = None
+		self.session = None  # This allways gonna be the current ongoing session, if any
 		self.wave_file = None  # This will be played to the user requesting something
-		self.player = None
+		self.player = None  # Wave player that will play the requested file
 		self.ended = Event()
+
+		self.speech_sub = None
+		self.speech_region = None
+		self.sepeech_language = None
+		self.recognizer = None
+		self.triggers = None
 
 		notification_center = NotificationCenter()
 		notification_center.add_observer(self)
@@ -40,41 +44,58 @@ class VoIPBot(SIPApplication):
 	@run_in_green_thread
 	def _NH_SIPApplicationDidStart(self, notification):
 		"""
+		TODO: Write documentation
+
+		:param notification: [description]
+		:type notification: [type]
 		"""
 		self.player = WavePlayer(SIPApplication.voice_audio_mixer, self.wave_file, loop_count=1)
-		# self.session = Session(self.account)
-
 		print('SIP application started')
 
 	def _NH_SIPSessionDidStart(self, notification):
 		"""
 		This method should start a new session, and also create AudioBridge to pass the incoming stream to the STT processor.
+
+		:param notification: [description]
+		:type notification: [type]
 		"""
 		print('Session started!')
-
+		self.session = notification.sender
 
 	def _NH_SIPSessionDidFail(self, notification):
 		"""
-		Cleanup whatever you started
+		TODO: Write documentation
+
+		:param notification: [description]
+		:type notification: [type]
 		"""
 		print('Failed to connect')
-		# self.session = None
+		self.session = None
+		self.player.stop()
 
 	def _NH_SIPSessionDidEnd(self, notification):
 		"""
-		Cleanup Session and AudioBridge
+		TODO: Write documentation
+
+		:param notification: [description]
+		:type notification: [type]
 		"""
-		print('Session ended')
-		# self.session = None
+		print('Session ended . . .')
+		self.session = None
+		self.player.stop()
 
 	def _NH_SIPSessionNewIncoming(self, notification):
 		"""
-		
+		TODO: Write documentation
+
+		:param notification: [description]
+		:type notification: [type]
 		"""
 		print("Incoming call . . .")
-		print(notification.sender)
-		self.session = notification.sender
-		self.session.accept(notification.data.streams)
+		session = notification.sender
+		session.send_ring_indication()
+		# Maybe some kind of accept/decline (not needed for now)
+		session.accept(notification.data.streams)
 
 	##############################################################
 	########################## HELPERS ###########################
@@ -82,11 +103,12 @@ class VoIPBot(SIPApplication):
 	@execute_once
 	def prepare(self):
 		"""
-		
+		TODO: Write documentation
 		"""
 		print("Preparing VoIP bot . . .")
 		self.start(FileStorage("config"))
 
+		# This is obviously not the ideal way of loging into an account
 		acc_manager = AccountManager()
 		if not acc_manager.has_account("ondewo@sip2sip.info"):
 			acc = Account("ondewo@sip2sip.info")
@@ -99,19 +121,37 @@ class VoIPBot(SIPApplication):
 		settings.default_account = "ondewo@sip2sip.info"
 		self.account = acc_manager.default_account
 		settings.audio.alert_device = "system_default"
-		settings.audio.input_device = "system_dafault"
+		settings.audio.input_device = None
 		settings.audio.output_device = "system_default"
 		settings.save()
 
 	def cleanup(self):
 		"""
-		
+		TODO: Write documentation
 		"""
 		self.stop()
 
 	def handle_notification(self, notification):
+		"""
+		TODO: Write documentation
+
+		:param notification: [description]
+		:type notification: [type]
+		"""
 		handler = getattr(self, '_NH_%s' % notification.name, Null)
 		handler(notification)
+
+	def add_media_to_session(self, relative_location):
+		"""
+		TODO: Write documentation
+
+		:param relative_location: [description]
+		:type relative_location: str
+		"""
+		audio_stream = self.session.streams[0]
+		audio_stream.bridge.add(self.player)
+		self.player.filename = relative_location
+		self.player.play()
 
 
 def main():
