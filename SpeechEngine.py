@@ -1,4 +1,4 @@
-from threading import Event
+from threading import Thread
 import time
 
 from base64 import b64decode
@@ -12,15 +12,14 @@ OptionalStr = Optional[str]
 
 
 class STTEngine():
-    def __init__(self, triggers: Dict):
+    def __init__(self, triggers: Dict, notification_center: NotificationCenter):
         """[summary]
 
         :param triggers: [description]
         :type triggers: Dict
         """
 
-        self.notification_center = NotificationCenter()
-        self.notification_center.add_observer(self)
+        self.notification_center = notification_center
 
         self.speech_sub = b64decode("YTY5MDAyY2RhZWFmNDUzZWFjNWE4NDU3OWE3YTUzMmM=").decode("utf-8")
         self.speech_region = "westeurope"
@@ -36,10 +35,11 @@ class STTEngine():
         self.recognizer = STT.SpeechRecognizer(speech_config=self.speech_config)
 
         self.found = False  # Use this to stop continuous recognition
+        self.event = None
 
-	##############################################################
-	########################### EVENTS ###########################
-	##############################################################
+    ##############################################################
+    ########################### EVENTS ###########################
+    ##############################################################
     def evt_session_started(self, evt):
         """[summary]
 
@@ -72,6 +72,7 @@ class STTEngine():
         :param evt: [description]
         :type evt: [type]
         """
+        return
         print("Recognizing {}".format(evt))
 
     def evt_recognized(self, evt):
@@ -81,17 +82,16 @@ class STTEngine():
         :type evt: [type]
         """
         text = evt.result.text
-        if text.lower().strip(".") in self.triggers:
+        text_lower = text.lower().strip(".")
+        if text_lower in self.triggers:
             print("Recognized command: {}".format(text))
-            self.notification_center.post_notification(
-                    self.triggers[evt.result.text], 
-                    self.recognizer, 
-                    data=NotificationData()
-                )
+            self.found = True
+            self.recognizer.stop_continuous_recognition()
+        self.event = text_lower
 
     ##############################################################
-	########################## HELPERS ###########################
-	##############################################################
+    ########################## HELPERS ###########################
+    ##############################################################
 
     def speech_recognition_from_mic(self):
         """[summary]
@@ -127,4 +127,18 @@ class STTEngine():
         :type event: [type]
         """
         self.found = True
-        print("Closing: ".format(evt))
+        print("Speech recognition finished.")
+        self.notify(self.event)
+
+    def notify(self, trigger):
+        """[summary]
+
+        :param trigger: [description]
+        :type trigger: [type]
+        """
+        print("Sending notification: {}".format(self.triggers[trigger]))
+        self.notification_center.post_notification(
+                    self.triggers[trigger], 
+                    self.recognizer, 
+                    data=NotificationData()
+                )

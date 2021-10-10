@@ -1,16 +1,17 @@
 from threading import Event
-import base64
+
 from application.notification import NotificationCenter
 from application.python import Null
 from sipsimple.configuration.settings import SIPSimpleSettings
 
-from sipsimple.session import Session
 from sipsimple.account import Account, AccountManager
 from sipsimple.application import SIPApplication
 from sipsimple.audio import WavePlayer
 from sipsimple.storage import FileStorage
 from sipsimple.threading.green import run_in_green_thread
 from sipsimple.util import execute_once
+
+from SpeechEngine import STTEngine
 
 
 class VoIPBot(SIPApplication):
@@ -32,10 +33,10 @@ class VoIPBot(SIPApplication):
 		self.speech_region = None
 		self.sepeech_language = None
 		self.recognizer = None
-		self.triggers = None
+		self.triggers = {}
 
-		notification_center = NotificationCenter()
-		notification_center.add_observer(self)
+		self.notification_center = NotificationCenter()
+		self.notification_center.add_observer(self)
 
 	##############################################################
 	########################### EVENTS ###########################
@@ -61,6 +62,7 @@ class VoIPBot(SIPApplication):
 		"""
 		print('Session started!')
 		self.session = notification.sender
+		self.recognizer.speech_recognition_from_mic()
 
 	def _NH_SIPSessionDidFail(self, notification):
 		"""
@@ -72,6 +74,7 @@ class VoIPBot(SIPApplication):
 		print('Failed to connect')
 		self.session = None
 		self.player.stop()
+		self.recognizer.recognizer.stop_continuous_recognition()
 
 	def _NH_SIPSessionDidEnd(self, notification):
 		"""
@@ -83,6 +86,7 @@ class VoIPBot(SIPApplication):
 		print('Session ended . . .')
 		self.session = None
 		self.player.stop()
+		self.recognizer.recognizer.stop_continuous_recognition()
 
 	def _NH_SIPSessionNewIncoming(self, notification):
 		"""
@@ -96,6 +100,30 @@ class VoIPBot(SIPApplication):
 		session.send_ring_indication()
 		# Maybe some kind of accept/decline (not needed for now)
 		session.accept(notification.data.streams)
+
+	def _NH_PlaySongRequested(self, notification):
+		"""[summary]
+
+		:param notification: [description]
+		:type notification: [type]
+		"""
+		self.add_media_to_session("./media/sounds/PinkPanther60.wav")
+
+	def _NH_PlayJokeRequested(self, notification):
+		"""[summary]
+
+		:param notification: [description]
+		:type notification: [type]
+		"""
+		print("This should play a joke")
+
+	def _NH_TestRequested(self, notification):
+		"""[summary]
+
+		:param notification: [description]
+		:type notification: [type]
+		"""
+		print("test notification triggered")
 
 	##############################################################
 	########################## HELPERS ###########################
@@ -125,6 +153,13 @@ class VoIPBot(SIPApplication):
 		settings.audio.output_device = "system_default"
 		settings.save()
 
+		self.triggers = {
+			"i want to listen to a song": "PlaySongRequested",
+			" want to hear a joke": "PlayJokeRequested",
+			"test": "TestRequested"
+		}
+		self.recognizer = STTEngine(self.triggers, self.notification_center)
+
 	def cleanup(self):
 		"""
 		TODO: Write documentation
@@ -139,6 +174,8 @@ class VoIPBot(SIPApplication):
 		:type notification: [type]
 		"""
 		handler = getattr(self, '_NH_%s' % notification.name, Null)
+		if notification.name in [self.triggers.values()]:
+			print("{} will be called".format(notification.name))
 		handler(notification)
 
 	def add_media_to_session(self, relative_location):
