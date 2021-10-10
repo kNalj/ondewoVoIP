@@ -1,6 +1,6 @@
 from threading import Event
 
-from application.notification import NotificationCenter
+from application.notification import NotificationCenter, Notification
 from application.python import Null
 from sipsimple.configuration.settings import SIPSimpleSettings
 
@@ -17,7 +17,8 @@ from SpeechEngine import STTEngine
 class VoIPBot(SIPApplication):
 	def __init__(self):
 		"""
-		TODO: Write documentation
+		Constructor for the VoIPBot class.  Creates empty member variables, and 
+		subscribes itself to a notification center.
 		"""
 		print("Building VoIP bot . . .")
 
@@ -43,57 +44,74 @@ class VoIPBot(SIPApplication):
 	##############################################################
 
 	@run_in_green_thread
-	def _NH_SIPApplicationDidStart(self, notification):
+	def _NH_SIPApplicationDidStart(self, notification: Notification):
 		"""
-		TODO: Write documentation
+		SIPApplication will fire this event as soon as it starts.
 
-		:param notification: [description]
-		:type notification: [type]
+		Once the application started, create and configure the wave player.
+		This could be done in some other place as well.
+
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
-		self.player = WavePlayer(SIPApplication.voice_audio_mixer, self.wave_file, loop_count=1)
+		self.player = WavePlayer(
+			SIPApplication.voice_audio_mixer, 
+			self.wave_file, 
+			loop_count=1
+		)
 		print('SIP application started')
 
-	def _NH_SIPSessionDidStart(self, notification):
+	def _NH_SIPSessionDidStart(self, notification: Notification):
 		"""
-		This method should start a new session, and also create AudioBridge to pass the incoming stream to the STT processor.
+		SIPApplication will fire this event as soon as a new session starts.
 
-		:param notification: [description]
-		:type notification: [type]
+		When a new session has started, make sure to save the proposed session 
+		and start the recognizer
+
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		print('Session started!')
 		self.session = notification.sender
-		self.recognizer.speech_recognition_from_mic()
+		self.recognizer.recognizer.start_continuous_recognition()
 
-	def _NH_SIPSessionDidFail(self, notification):
+	def _NH_SIPSessionDidFail(self, notification: Notification):
 		"""
-		TODO: Write documentation
+		SIPApplication will fire this event in case a session fails.
 
-		:param notification: [description]
-		:type notification: [type]
+		In case that the session fails, cleanup by stoping the player if it is
+		running, and stopping the recognizer.
+
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		print('Failed to connect')
 		self.session = None
 		self.player.stop()
 		self.recognizer.recognizer.stop_continuous_recognition()
 
-	def _NH_SIPSessionDidEnd(self, notification):
+	def _NH_SIPSessionDidEnd(self, notification: Notification):
 		"""
-		TODO: Write documentation
+		SIPApplication will fire this event when a session ends.
 
-		:param notification: [description]
-		:type notification: [type]
+		Whan a session ends, cleanup by stoping the player if it is running, 
+		and stopping the recognizer.
+
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		print('Session ended . . .')
 		self.session = None
 		self.player.stop()
 		self.recognizer.recognizer.stop_continuous_recognition()
 
-	def _NH_SIPSessionNewIncoming(self, notification):
+	def _NH_SIPSessionNewIncoming(self, notification: Notification):
 		"""
-		TODO: Write documentation
+		SIPApplication will fire this event when another SIP client proposes
+		a new session to it (for example on incoming call).
 
-		:param notification: [description]
-		:type notification: [type]
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		print("Incoming call . . .")
 		session = notification.sender
@@ -101,27 +119,32 @@ class VoIPBot(SIPApplication):
 		# Maybe some kind of accept/decline (not needed for now)
 		session.accept(notification.data.streams)
 
-	def _NH_PlaySongRequested(self, notification):
-		"""[summary]
+	def _NH_PlaySongRequested(self, notification: Notification):
+		"""
+		Recognizer will fire this event once a certain phrase matching this 
+		action is recognized.
 
-		:param notification: [description]
-		:type notification: [type]
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		self.add_media_to_session("./media/sounds/PinkPanther60.wav")
 
-	def _NH_PlayJokeRequested(self, notification):
-		"""[summary]
+	def _NH_PlayJokeRequested(self, notification: Notification):
+		"""
+		Recognizer will fire this event once a certain phrase matching this 
+		action is recognized.
 
-		:param notification: [description]
-		:type notification: [type]
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		print("This should play a joke")
 
-	def _NH_TestRequested(self, notification):
-		"""[summary]
+	def _NH_TestRequested(self, notification: Notification):
+		"""
+		Used for testing the notification system.
 
-		:param notification: [description]
-		:type notification: [type]
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		print("test notification triggered")
 
@@ -131,12 +154,20 @@ class VoIPBot(SIPApplication):
 	@execute_once
 	def prepare(self):
 		"""
-		TODO: Write documentation
+		This is a helper method that that prepares things needed for this class
+		 to function properly. Start the app with the specified config file.
+		 To make sure that correct data is written in the config file write it
+		 all in the file anyway. This includes account data, and audio 
+		 configuration.
+
+		 Finnaly create a dictionary containing all the trigger phrases that
+		 this bot should respond to, and create a speech to text engine to 
+		 which that dictionary is passed.
 		"""
 		print("Preparing VoIP bot . . .")
 		self.start(FileStorage("config"))
 
-		# This is obviously not the ideal way of loging into an account
+		# This is obviously not the ideal way of loging into an account,
 		acc_manager = AccountManager()
 		if not acc_manager.has_account("ondewo@sip2sip.info"):
 			acc = Account("ondewo@sip2sip.info")
@@ -163,26 +194,29 @@ class VoIPBot(SIPApplication):
 	def cleanup(self):
 		"""
 		TODO: Write documentation
+
+		Not even sure i will need this one
 		"""
+		# do stuff
 		self.stop()
 
-	def handle_notification(self, notification):
+	def handle_notification(self, notification: Notification):
 		"""
-		TODO: Write documentation
+		A helper method that catches events and calls appropriate handle method
+		 based on the data passed in the notification.
 
-		:param notification: [description]
-		:type notification: [type]
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
 		"""
 		handler = getattr(self, '_NH_%s' % notification.name, Null)
-		if notification.name in [self.triggers.values()]:
-			print("{} will be called".format(notification.name))
 		handler(notification)
 
 	def add_media_to_session(self, relative_location):
 		"""
-		TODO: Write documentation
+		Helper method that adds a player to the current session. The player 
+		will play the file passed to this method.
 
-		:param relative_location: [description]
+		:param relative_location: Relative location of the file to play
 		:type relative_location: str
 		"""
 		audio_stream = self.session.streams[0]

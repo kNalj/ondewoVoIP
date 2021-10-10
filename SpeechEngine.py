@@ -1,25 +1,36 @@
-from threading import Thread
-import time
-
 from base64 import b64decode
 from typing import Optional, Dict
-from application.notification import Notification, NotificationCenter, NotificationData
+
+from application.notification import IObserver, NotificationCenter, NotificationData
+from application.python import Null
+from azure.cognitiveservices.speech.speech import EventSignal
+from zope.interface import implementer
 
 import azure.cognitiveservices.speech as STT
 
 
-OptionalStr = Optional[str]
-
-
+@implementer(IObserver)
 class STTEngine():
     def __init__(self, triggers: Dict, notification_center: NotificationCenter):
-        """[summary]
+        """
+        Constructor for STTEngine class. Subscribe self to the notification 
+        center passed to it. This allows it to send and recieve notifications 
+        from SIPApplication which instantiates it.
 
-        :param triggers: [description]
+        TODO: Figure out if NotificationCenter is singleton, maybe i dont even 
+        need to pass it to the constructor
+
+        :param triggers: Keys are the exact phrases that the recognizer will be 
+        looking for, and the values are the event names that will be fired when 
+        those phrases are recognized.
         :type triggers: Dict
+        :param notification_center: Pass a notification center to this class in 
+        order to be able to notify other classes about recognizing phrases.
+        :type notification_center: NotificationCenter
         """
 
         self.notification_center = notification_center
+        self.notification_center.add_observer(self)
 
         self.speech_sub = b64decode("YTY5MDAyY2RhZWFmNDUzZWFjNWE4NDU3OWE3YTUzMmM=").decode("utf-8")
         self.speech_region = "westeurope"
@@ -33,80 +44,96 @@ class STTEngine():
 
         self.triggers = triggers  # Sentences that trigger a command
         self.recognizer = STT.SpeechRecognizer(speech_config=self.speech_config)
-
-        self.found = False  # Use this to stop continuous recognition
-        self.event = None
+        self.connect_signals()
 
     ##############################################################
     ########################### EVENTS ###########################
     ##############################################################
-    def evt_session_started(self, evt):
-        """[summary]
+    def evt_session_started(self, evt: EventSignal):
+        """
+        Event handler for SpeechRecognizers SessionStarted signal. Currently 
+        used only to check if the recognizer started properly.
 
-        :param evt: [description]
-        :type evt: [type]
+        :param evt: SpeechRecognizer class fires this event when its initially 
+        started
+        :type evt: EventSignal
         """
         print("Session started: {}".format(evt))
 
-    def evt_session_ended(self, evt):
-        """[summary]
+    def evt_session_ended(self, evt: EventSignal):
+        """
+        Event handler for SpeechRecognizers SessionEnded signal. Makes a call 
+        to stop_callback() method. This method does any necessary cleanup after 
+        the recognizer is done.
 
-        :param evt: [description]
-        :type evt: [type]
+        :param evt: SpeechRecognizer class fires this event when the session 
+        ends
+        :type evt: EventSignal
         """
         print("Session ended: {}".format(evt))
         self.stop_callback(evt)
 
-    def evt_canceled(self, evt):
-        """[summary]
+    def evt_canceled(self, evt: EventSignal):
+        """
+        Event handler for SpeechRecognizers SessionCancel signal. Makes a call 
+        to stop_callback() method. This method does any necessary cleanup after 
+        the recognizer is done.
 
-        :param evt: [description]
-        :type evt: [type]
+        :param evt: SpeechRecognizer class fires this event when recognizer 
+        gets cancelled.
+        :type evt: EventSignal
         """
         print("Canceled {}".format(evt))
         self.stop_callback(evt)
 
-    def evt_recognizing(self, evt):
-        """[summary]
+    def evt_recognizing(self, evt: EventSignal):
+        """
+        Event handler for SpeechRecognizers Recognizing signal. Makes a call 
+        to stop_callback() method. Currently used only to check if the 
+        recognizer is registering input.
 
-        :param evt: [description]
-        :type evt: [type]
+        :param evt: SpeechRecognizer class fires this event when input comes 
+        through and it is being processed.
+        :type evt: EventSignal
         """
         return
         print("Recognizing {}".format(evt))
 
-    def evt_recognized(self, evt):
-        """[summary]
+    def evt_recognized(self, evt: EventSignal):
+        """
+        Use this signal to check if the recognized phrase fits any of the 
+        phrases that were passed to the constructor, and in case that it does 
+        fire an event to notify other listeners about it.
 
-        :param evt: [description]
-        :type evt: [type]
+        :param evt: SpeechRecognizer class fires this event when an input gets 
+        recognized.
+        :type evt: EventSignal
         """
         text = evt.result.text
         text_lower = text.lower().strip(".")
         if text_lower in self.triggers:
             print("Recognized command: {}".format(text))
-            self.found = True
-            self.recognizer.stop_continuous_recognition()
-        self.event = text_lower
+            self.notify(text_lower)
 
     ##############################################################
     ########################## HELPERS ###########################
     ##############################################################
 
-    def speech_recognition_from_mic(self):
-        """[summary]
+    def handle_notification(self, notification):
         """
+		A helper method that catches events and calls appropriate handle method
+		 based on the data passed in the notification.
 
-        self.connect_signals()
-        self.recognizer.start_continuous_recognition()
-
-        while not self.found:
-            time.sleep(.5)
-
-        self.recognizer.stop_continuous_recognition()
+		:param notification: Any data that the notification sender might pass
+		:type notification: Notification
+		"""
+        handler = getattr(self, '_NH_%s' % notification.name, Null)
+        handler(notification)
         
     def connect_signals(self):
-        """[summary]
+        """
+        Helper method to connect all of the recognizers signals to appropriate 
+        methods.
         """
         # Let everyone know i started a session
         self.recognizer.session_started.connect(lambda evt: self.evt_session_started(evt))
@@ -120,18 +147,22 @@ class STTEngine():
         # This is what i heard, let me see if its a command
         self.recognizer.recognized.connect(lambda evt: self.evt_recognized(evt))
 
-    def stop_callback(self, evt):
-        """[summary]
+    def stop_callback(self, evt: EventSignal):
+        """
+        A helper method to cleanup after the reconizer has been stopped or 
+        cancelled.
 
-        :param event: [description]
-        :type event: [type]
+        :param event: The same event that has been passed to the method that is 
+        calling this method.
+        :type event: EventSignal
         """
         self.found = True
         print("Speech recognition finished.")
-        self.notify(self.event)
 
     def notify(self, trigger):
-        """[summary]
+        """
+        A helper method to send a notification to all listeners of the 
+        notification center passed to the constructor of this class.
 
         :param trigger: [description]
         :type trigger: [type]
