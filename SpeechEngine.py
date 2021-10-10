@@ -1,7 +1,7 @@
 from base64 import b64decode
 from typing import Optional, Dict
 
-from application.notification import IObserver, NotificationCenter, NotificationData
+from application.notification import IObserver, NotificationCenter, NotificationData, Notification
 from application.python import Null
 from azure.cognitiveservices.speech.speech import EventSignal
 from zope.interface import implementer
@@ -114,6 +114,45 @@ class STTEngine():
         if text_lower in self.triggers:
             print("Recognized command: {}".format(text))
             self.notify(text_lower)
+
+    def _NH_SIPSessionDidStart(self, notification):
+        """
+        SIPApplication will fire this event as soon as a new session starts.
+
+        When a new session has started, make sure to save the proposed session 
+        and start the recognizer
+
+        :param notification: Any data that the notification sender might pass
+        :type notification: Notification
+        """
+        print('Session started!')
+        # self.recognizer.start_continuous_recognition()
+
+    def _NH_SIPSessionDidFail(self, notification):
+        """
+        SIPApplication will fire this event in case a session fails.
+
+        In case that the session fails, cleanup by stoping the player if it is
+        running, and stopping the recognizer.
+
+        :param notification: Any data that the notification sender might pass
+        :type notification: Notification
+        """
+        print('Failed to connect')
+        # self.recognizer.stop_continuous_recognition()
+
+    def _NH_SIPSessionDidEnd(self, notification):
+        """
+        SIPApplication will fire this event when a session ends.
+
+        Whan a session ends, cleanup by stoping the player if it is running, 
+        and stopping the recognizer.
+
+        :param notification: Any data that the notification sender might pass
+        :type notification: Notification
+        """
+        print('Session ended . . .')
+        # self.recognizer.stop_continuous_recognition()
 
     ##############################################################
     ########################## HELPERS ###########################

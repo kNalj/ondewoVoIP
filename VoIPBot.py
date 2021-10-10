@@ -1,4 +1,4 @@
-from threading import Event
+from threading import Event, Thread
 
 from application.notification import NotificationCenter, Notification
 from application.python import Null
@@ -44,7 +44,7 @@ class VoIPBot(SIPApplication):
 	##############################################################
 
 	@run_in_green_thread
-	def _NH_SIPApplicationDidStart(self, notification: Notification):
+	def _NH_SIPApplicationDidStart(self, notification):
 		"""
 		SIPApplication will fire this event as soon as it starts.
 
@@ -61,7 +61,7 @@ class VoIPBot(SIPApplication):
 		)
 		print('SIP application started')
 
-	def _NH_SIPSessionDidStart(self, notification: Notification):
+	def _NH_SIPSessionDidStart(self, notification):
 		"""
 		SIPApplication will fire this event as soon as a new session starts.
 
@@ -75,7 +75,7 @@ class VoIPBot(SIPApplication):
 		self.session = notification.sender
 		self.recognizer.recognizer.start_continuous_recognition()
 
-	def _NH_SIPSessionDidFail(self, notification: Notification):
+	def _NH_SIPSessionDidFail(self, notification):
 		"""
 		SIPApplication will fire this event in case a session fails.
 
@@ -90,7 +90,7 @@ class VoIPBot(SIPApplication):
 		self.player.stop()
 		self.recognizer.recognizer.stop_continuous_recognition()
 
-	def _NH_SIPSessionDidEnd(self, notification: Notification):
+	def _NH_SIPSessionDidEnd(self, notification):
 		"""
 		SIPApplication will fire this event when a session ends.
 
@@ -105,7 +105,7 @@ class VoIPBot(SIPApplication):
 		self.player.stop()
 		self.recognizer.recognizer.stop_continuous_recognition()
 
-	def _NH_SIPSessionNewIncoming(self, notification: Notification):
+	def _NH_SIPSessionNewIncoming(self, notification):
 		"""
 		SIPApplication will fire this event when another SIP client proposes
 		a new session to it (for example on incoming call).
@@ -119,7 +119,7 @@ class VoIPBot(SIPApplication):
 		# Maybe some kind of accept/decline (not needed for now)
 		session.accept(notification.data.streams)
 
-	def _NH_PlaySongRequested(self, notification: Notification):
+	def _NH_PlaySongRequested(self, notification):
 		"""
 		Recognizer will fire this event once a certain phrase matching this 
 		action is recognized.
@@ -127,9 +127,9 @@ class VoIPBot(SIPApplication):
 		:param notification: Any data that the notification sender might pass
 		:type notification: Notification
 		"""
-		self.add_media_to_session("./media/sounds/PinkPanther60.wav")
+		self.add_media_to_session("./media/sounds/song.wav")
 
-	def _NH_PlayJokeRequested(self, notification: Notification):
+	def _NH_PlayJokeRequested(self, notification):
 		"""
 		Recognizer will fire this event once a certain phrase matching this 
 		action is recognized.
@@ -137,9 +137,9 @@ class VoIPBot(SIPApplication):
 		:param notification: Any data that the notification sender might pass
 		:type notification: Notification
 		"""
-		print("This should play a joke")
+		self.add_media_to_session("./media/sounds/joke.wav")
 
-	def _NH_TestRequested(self, notification: Notification):
+	def _NH_TestRequested(self, notification):
 		"""
 		Used for testing the notification system.
 
@@ -186,7 +186,7 @@ class VoIPBot(SIPApplication):
 
 		self.triggers = {
 			"i want to listen to a song": "PlaySongRequested",
-			" want to hear a joke": "PlayJokeRequested",
+			"i want to hear a joke": "PlayJokeRequested",
 			"test": "TestRequested"
 		}
 		self.recognizer = STTEngine(self.triggers, self.notification_center)
