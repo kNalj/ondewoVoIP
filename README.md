@@ -390,7 +390,11 @@ There are many ways to make this work, i chose the one that was simplest for me 
      - Close all terminals, and the VoIPBot is ready to work.
  
     </details>
- 
+
+ 9) Run the bot and use any SIP client to make a call to the bot.
+    - Issue a command of your choice
+    - Wait for bots response
+
 
 ## SOURCES: 
   - https://brb.nci.nih.gov/seqtools/installUbuntu.html
