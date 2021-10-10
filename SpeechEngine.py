@@ -160,12 +160,12 @@ class STTEngine():
 
     def handle_notification(self, notification):
         """
-		A helper method that catches events and calls appropriate handle method
-		 based on the data passed in the notification.
+        A helper method that catches events and calls appropriate handle method
+            based on the data passed in the notification.
 
-		:param notification: Any data that the notification sender might pass
-		:type notification: Notification
-		"""
+        :param notification: Any data that the notification sender might pass
+        :type notification: Notification
+        """
         handler = getattr(self, '_NH_%s' % notification.name, Null)
         handler(notification)
         
