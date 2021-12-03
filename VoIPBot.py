@@ -23,7 +23,7 @@ class VoIPBot(SIPApplication):
 		print("Building VoIP bot . . .")
 
 		super(SIPApplication, self).__init__()
-		
+
 		self.account = None
 		self.session = None  # This allways gonna be the current ongoing session, if any
 		self.wave_file = None  # This will be played to the user requesting something
